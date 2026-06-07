@@ -8,11 +8,11 @@ const DYNAMIC_CACHE = 'hidromelon-dynamic-v1';
 
 /* Aset statis yang di-cache saat install */
 const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './script.js',
-  './manifest.json',
+  '/agrivisv2/',
+  '/agrivisv2/index.html',
+  '/agrivisv2/style.css',
+  '/agrivisv2/script.js',
+  '/agrivisv2/manifest.json',
   'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
@@ -103,7 +103,7 @@ async function cacheFirst(request, cacheName = DYNAMIC_CACHE) {
   } catch (err) {
     /* Offline fallback untuk navigasi */
     if (request.mode === 'navigate') {
-      const cachedHome = await caches.match('./index.html');
+      const cachedHome = await caches.match('/agrivisv2/index.html');
       if (cachedHome) return cachedHome;
     }
     return offlineResponse('page');
@@ -218,12 +218,12 @@ self.addEventListener('push', (event) => {
     badge: './icons/icon-96.png',
     tag: 'hidromelon-alert',
     renotify: true,
-    data: { url: data.url || './' }
+    data: { url: data.url || '/agrivisv2/' }
   });
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || './';
+  const url = event.notification.data?.url || '/agrivisv2/';
   event.waitUntil(clients.openWindow(url));
 });

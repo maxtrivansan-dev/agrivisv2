@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
+
+    <!-- ========================
+         PWA — Meta Tags
+         ======================== -->
+    <meta name="application-name" content="HidroMelon" />
+    <meta
+      name="description"
+      content="Dashboard Monitor & Kontrol IoT hidroponik melon berbasis ESP32 & Firebase"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HidroMelon" />
+    <meta name="msapplication-TileColor" content="#1d9e75" />
+    <meta name="msapplication-TileImage" content="icons/icon-144.png" />
+
+    <!-- Theme color (light / dark) -->
+    <meta
+      name="theme-color"
+      content="#f5f4ef"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#1c1c1a"
+      media="(prefers-color-scheme: dark)"
+    />
+
+    <!-- ========================
+         PWA — Web App Manifest
+         ======================== -->
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- ========================
+         PWA — Apple Touch Icons
+         ======================== -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/icon-96.png" />
+    <link rel="shortcut icon" href="icons/icon-96.png" />
+
+    <title>Hidroponik Melon — Dashboard IoT</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- ========================
+         PWA Install Banner Styles
+         ======================== -->
+    <style>
+      /* Install prompt banner */
+      #pwa-install-banner {
+        display: none;
+        position: fixed;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        background: var(--bg2, #fff);
+        border: 0.5px solid var(--border, rgba(0, 0, 0, 0.1));
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        display: none;
+        align-items: center;
+        gap: 12px;
+        max-width: 380px;
+        width: calc(100% - 2rem);
+        animation: bannerSlideUp 0.35s ease;
+      }
+      @keyframes bannerSlideUp {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+      #pwa-install-banner .banner-icon {
+        font-size: 28px;
+        flex-shrink: 0;
+      }
+      #pwa-install-banner .banner-text {
+        flex: 1;
+        min-width: 0;
+      }
+      #pwa-install-banner .banner-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text, #1a1a18);
+      }
+      #pwa-install-banner .banner-sub {
+        font-size: 11px;
+        color: var(--text2, #5f5e5a);
+        margin-top: 2px;
+      }
+      #pwa-install-banner .banner-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      #pwa-install-banner .btn-install {
+        background: #1d9e75;
+        color: white;
+        border: none;
+        border-radius: 7px;
+        padding: 7px 13px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #pwa-install-banner .btn-dismiss {
+        background: transparent;
+        border: 0.5px solid var(--border2, rgba(0, 0, 0, 0.18));
+        border-radius: 7px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--text2, #5f5e5a);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      /* Offline indicator */
+      #offline-bar {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10000;
+        background: #e24b4a;
+        color: white;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 12px;
+      }
+
+      /* Update available toast */
+      #update-toast {
+        display: none;
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 9999;
+        background: var(--bg2, #fff);
+        border: 0.5px solid var(--border, rgba(0, 0, 0, 0.1));
+        border-radius: 10px;
+        padding: 10px 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        font-size: 12px;
+        color: var(--text, #1a1a18);
+        max-width: 280px;
+      }
+      #update-toast button {
+        margin-top: 8px;
+        background: #1d9e75;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 5px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Offline indicator -->
+    <div id="offline-bar">
+      <i class="ti ti-wifi-off"></i> Tidak ada koneksi internet — menampilkan
+      data terakhir yang tersimpan
+    </div>
+
+    <!-- Update available toast -->
+    <div id="update-toast">
+      <strong>🔄 Update Tersedia</strong><br />
+      Versi baru dashboard telah tersedia.
+      <button onclick="applyUpdate()">Perbarui Sekarang</button>
+    </div>
+
+    <!-- PWA Install banner -->
+    <div id="pwa-install-banner" role="banner">
+      <div class="banner-icon">🍈</div>
+      <div class="banner-text">
+        <div class="banner-title">Install HidroMelon</div>
+        <div class="banner-sub">
+          Akses dashboard lebih cepat dari layar utama
+        </div>
+      </div>
+      <div class="banner-actions">
+        <button class="btn-install" id="btn-install-pwa">Install</button>
+        <button class="btn-dismiss" id="btn-dismiss-pwa">✕</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <div class="logo">🍈</div>
+        <div class="header-text">
+          <h1>Hidroponik Melon</h1>
+          <p>Dashboard Monitor & Kontrol IoT — ESP32</p>
+        </div>
+        <div class="live-pill">
+          <span class="live-dot"></span><span>Live</span>
+        </div>
+      </div>
+
+      <div class="alert-area" id="alert-area"></div>
+
+      <!-- SENSOR -->
+      <div class="section-label">Data Sensor</div>
+      <div class="sensor-grid">
+        <div class="sensor-card ph">
+          <div class="sensor-lbl"><i class="ti ti-flask"></i> pH Air</div>
+          <div class="sensor-val" id="v-ph">—</div>
+          <div class="sensor-unit">nilai pH (ideal: 5.5–7.0)</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-ph"
+              style="background: #1d9e75"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card tds">
+          <div class="sensor-lbl">
+            <i class="ti ti-droplet"></i> TDS Nutrisi
+          </div>
+          <div class="sensor-val" id="v-tds">—</div>
+          <div class="sensor-unit">ppm (ideal: 800–1200)</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-tds"
+              style="background: #378add"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card jarak">
+          <div class="sensor-lbl"><i class="ti ti-ruler"></i> Level Air</div>
+          <div class="sensor-val" id="v-jarak">—</div>
+          <div class="sensor-unit">cm dari sensor</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-jarak"
+              style="background: #ba7517"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card suhuair">
+          <div class="sensor-lbl">
+            <i class="ti ti-temperature"></i> Suhu Air
+          </div>
+          <div class="sensor-val" id="v-suhu-air">—</div>
+          <div class="sensor-unit">°C (ideal: 18–26°C)</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-suhu-air"
+              style="background: #d85a30"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card cahaya">
+          <div class="sensor-lbl"><i class="ti ti-sun"></i> Cahaya</div>
+          <div class="sensor-val" id="v-cahaya">—</div>
+          <div class="sensor-unit">lux</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-cahaya"
+              style="background: #ba7517"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card dhtsuhu">
+          <div class="sensor-lbl">
+            <i class="ti ti-thermometer"></i> Suhu Udara
+          </div>
+          <div class="sensor-val" id="v-dht-suhu">—</div>
+          <div class="sensor-unit">°C — DHT22</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-dht-suhu"
+              style="background: #d4537e"
+            ></div>
+          </div>
+        </div>
+        <div class="sensor-card dhthum">
+          <div class="sensor-lbl"><i class="ti ti-cloud"></i> Kelembaban</div>
+          <div class="sensor-val" id="v-dht-hum">—</div>
+          <div class="sensor-unit">% RH — DHT22</div>
+          <div class="sensor-bar">
+            <div
+              class="sensor-bar-fill"
+              id="b-dht-hum"
+              style="background: #7f77dd"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mode-section">
+        <div class="section-label">Mode Kontrol</div>
+        <div class="mode-btns">
+          <button
+            class="mode-btn active-auto"
+            id="btn-auto"
+            onclick="setMode('auto')"
+          >
+            <i class="ti ti-robot"></i> Otomatis
+          </button>
+          <button class="mode-btn" id="btn-manual" onclick="setMode('manual')">
+            <i class="ti ti-hand-finger"></i> Manual
+          </button>
+        </div>
+        <div class="mode-info" id="mode-info">
+          <i class="ti ti-info-circle"></i>
+          <span id="mode-info-text"
+            >Mode <b>Otomatis</b>: Relay dikendalikan sistem berdasarkan nilai
+            sensor. Tombol relay dinonaktifkan.</span
+          >
+        </div>
+      </div>
+
+      <!-- RELAY -->
+      <div class="relay-section">
+        <div class="section-label">Status Relay</div>
+        <div class="relay-grid">
+          <div class="relay-card" id="card-r1">
+            <div class="relay-icon off" id="icon-r1">
+              <i class="ti ti-windmill"></i>
+            </div>
+            <div class="relay-info">
+              <div class="relay-name">CH1 — Pompa Sirkulasi</div>
+              <div class="relay-desc">Sirkulasi nutrisi & air ke tanaman</div>
+              <span class="relay-badge off" id="badge-r1">OFF</span>
+            </div>
+            <label class="relay-toggle disabled" id="lbl-r1">
+              <input
+                type="checkbox"
+                id="chk-r1"
+                onchange="toggleRelay(0, this.checked)"
+              />
+              <span class="relay-slider"></span>
+            </label>
+          </div>
+          <div class="relay-card" id="card-r2">
+            <div class="relay-icon off" id="icon-r2">
+              <i class="ti ti-droplet-half-2"></i>
+            </div>
+            <div class="relay-info">
+              <div class="relay-name">CH2 — Pompa Nutrisi</div>
+              <div class="relay-desc">Dosing TDS otomatis ke tangki</div>
+              <span class="relay-badge off" id="badge-r2">OFF</span>
+            </div>
+            <label class="relay-toggle disabled" id="lbl-r2">
+              <input
+                type="checkbox"
+                id="chk-r2"
+                onchange="toggleRelay(1, this.checked)"
+              />
+              <span class="relay-slider"></span>
+            </label>
+          </div>
+          <div class="relay-card" id="card-r3">
+            <div class="relay-icon off" id="icon-r3">
+              <i class="ti ti-wind"></i>
+            </div>
+            <div class="relay-info">
+              <div class="relay-name">CH3 — Kipas Ventilasi</div>
+              <div class="relay-desc">Mengontrol suhu udara greenhouse</div>
+              <span class="relay-badge off" id="badge-r3">OFF</span>
+            </div>
+            <label class="relay-toggle disabled" id="lbl-r3">
+              <input
+                type="checkbox"
+                id="chk-r3"
+                onchange="toggleRelay(2, this.checked)"
+              />
+              <span class="relay-slider"></span>
+            </label>
+          </div>
+          <div class="relay-card" id="card-r4">
+            <div class="relay-icon off" id="icon-r4">
+              <i class="ti ti-bulb"></i>
+            </div>
+            <div class="relay-info">
+              <div class="relay-name">CH4 — Lampu Grow</div>
+              <div class="relay-desc">Pencahayaan tambahan tanaman</div>
+              <span class="relay-badge off" id="badge-r4">OFF</span>
+            </div>
+            <label class="relay-toggle disabled" id="lbl-r4">
+              <input
+                type="checkbox"
+                id="chk-r4"
+                onchange="toggleRelay(3, this.checked)"
+              />
+              <span class="relay-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="pzem-section">
+        <div class="section-label">Monitoring Listrik — PZEM-004T</div>
+        <div class="pzem-grid">
+          <div class="pzem-card voltage">
+            <div class="pzem-lbl"><i class="ti ti-bolt"></i> Tegangan</div>
+            <div class="pzem-val" id="v-voltage">—</div>
+            <div class="pzem-unit">Volt (nominal: 220V)</div>
+            <span class="pzem-status" id="s-voltage">—</span>
+          </div>
+          <div class="pzem-card current">
+            <div class="pzem-lbl"><i class="ti ti-current-ac"></i> Arus</div>
+            <div class="pzem-val" id="v-current">—</div>
+            <div class="pzem-unit">Ampere</div>
+            <span class="pzem-status" id="s-current">—</span>
+          </div>
+          <div class="pzem-card power">
+            <div class="pzem-lbl"><i class="ti ti-gauge"></i> Daya</div>
+            <div class="pzem-val" id="v-power">—</div>
+            <div class="pzem-unit">Watt (aktif)</div>
+            <span class="pzem-status" id="s-power">—</span>
+          </div>
+          <div class="pzem-card energy">
+            <div class="pzem-lbl">
+              <i class="ti ti-battery-charging"></i> Energi
+            </div>
+            <div class="pzem-val" id="v-energy">—</div>
+            <div class="pzem-unit">kWh (total sesi)</div>
+            <span class="pzem-status" id="s-energy">—</span>
+          </div>
+          <div class="pzem-card freq">
+            <div class="pzem-lbl">
+              <i class="ti ti-wave-sine"></i> Frekuensi
+            </div>
+            <div class="pzem-val" id="v-freq">—</div>
+            <div class="pzem-unit">Hz (nominal: 50Hz)</div>
+            <span class="pzem-status" id="s-freq">—</span>
+          </div>
+          <div class="pzem-card pf">
+            <div class="pzem-lbl">
+              <i class="ti ti-math-function"></i> Power Factor
+            </div>
+            <div class="pzem-val" id="v-pf">—</div>
+            <div class="pzem-unit">cosφ (ideal: ≥0.95)</div>
+            <span class="pzem-status" id="s-pf">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHART PENGELUARAN LISTRIK -->
+      <div class="chart-section">
+        <div class="section-label">Estimasi Pengeluaran Listrik</div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">
+                <i class="ti ti-receipt" style="color: var(--amber)"></i> Grafik
+                Biaya Listrik Harian
+              </div>
+              <div class="chart-subtitle">
+                Estimasi berdasarkan konsumsi daya aktual PZEM
+              </div>
+            </div>
+          </div>
+          <div class="tariff-row">
+            <span class="tariff-label">Tarif PLN (Rp/kWh):</span>
+            <input
+              class="tariff-input"
+              type="number"
+              id="tariff-input"
+              value="1444"
+              min="100"
+              max="5000"
+              step="1"
+              oninput="updateCostCalc()"
+            />
+            <span style="font-size: 11px; color: var(--text3)"
+              >(default: Rp 1.444 — R-1/900VA)</span
+            >
+          </div>
+          <div class="cost-summary">
+            <div class="cost-box">
+              <div class="cost-box-label">Biaya Jam Ini</div>
+              <div class="cost-box-val green" id="cost-hour">Rp 0</div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-box-label">Estimasi Harian</div>
+              <div class="cost-box-val amber" id="cost-day">Rp 0</div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-box-label">Estimasi Bulanan</div>
+              <div class="cost-box-val blue" id="cost-month">Rp 0</div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-box-label">Daya Rata-rata</div>
+              <div class="cost-box-val" id="cost-avg-power">0 W</div>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="cost-chart" class="mainchart"></canvas>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background: #7f77dd"></div>
+              Daya (W)
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: #1d9e75"></div>
+              Biaya Akumulatif (Rp)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="section-label">Deteksi AI — Computer Vision</div>
+        <div class="ai-tabs">
+          <button
+            class="ai-tab active-fruit"
+            id="tab-fruit"
+            onclick="switchTab('fruit')"
+          >
+            <i class="ti ti-search"></i> Kematangan Buah
+          </button>
+          <button
+            class="ai-tab"
+            id="tab-disease"
+            onclick="switchTab('disease')"
+          >
+            <i class="ti ti-leaf"></i> Penyakit Daun
+          </button>
+        </div>
+        <div class="ai-panel" id="panel-fruit">
+          <div class="ai-panel-title">
+            <i class="ti ti-search" style="color: var(--amber)"></i> Deteksi
+            Kematangan Buah Melon
+          </div>
+          <div class="ai-panel-sub">
+            Upload foto buah melon untuk mendeteksi tingkat kematangannya
+            menggunakan AI
+          </div>
+          <div
+            class="upload-area"
+            id="upload-fruit"
+            ondragover="handleDrag(event, 'fruit')"
+            ondragleave="handleDragLeave(event, 'fruit')"
+            ondrop="handleDrop(event, 'fruit')"
+          >
+            <input
+              type="file"
+              accept="image/*"
+              onchange="handleFile(event, 'fruit')"
+            />
+            <div class="upload-icon"><i class="ti ti-photo-up"></i></div>
+            <div class="upload-label">Klik atau seret foto buah melon</div>
+            <div class="upload-hint">JPG, PNG, WEBP — Maks. 10MB</div>
+          </div>
+          <div class="img-preview-wrap" id="preview-fruit">
+            <img id="img-fruit" src="" alt="Preview buah" />
+            <canvas id="canvas-fruit" class="canvas-overlay"></canvas>
+            <button class="clear-btn" onclick="clearImage('fruit')">
+              <i class="ti ti-x"></i> Hapus
+            </button>
+          </div>
+          <button
+            class="detect-btn fruit"
+            id="btn-fruit"
+            onclick="detect('fruit')"
+            disabled
+          >
+            <div class="spinner" id="spin-fruit"></div>
+            <i class="ti ti-sparkles" id="ico-fruit"></i> Deteksi Kematangan
+          </button>
+          <div class="result-area" id="result-fruit"></div>
+        </div>
+        <div class="ai-panel" id="panel-disease" style="display: none">
+          <div class="ai-panel-title">
+            <i class="ti ti-leaf" style="color: var(--purple)"></i> Deteksi
+            Penyakit Daun Melon
+          </div>
+          <div class="ai-panel-sub">
+            Upload foto daun melon untuk mendeteksi kemungkinan penyakit
+            menggunakan AI
+          </div>
+          <div
+            class="upload-area"
+            id="upload-disease"
+            ondragover="handleDrag(event, 'disease')"
+            ondragleave="handleDragLeave(event, 'disease')"
+            ondrop="handleDrop(event, 'disease')"
+          >
+            <input
+              type="file"
+              accept="image/*"
+              onchange="handleFile(event, 'disease')"
+            />
+            <div class="upload-icon"><i class="ti ti-photo-up"></i></div>
+            <div class="upload-label">Klik atau seret foto daun melon</div>
+            <div class="upload-hint">JPG, PNG, WEBP — Maks. 10MB</div>
+          </div>
+          <div class="img-preview-wrap" id="preview-disease">
+            <img id="img-disease" src="" alt="Preview daun" />
+            <canvas id="canvas-disease" class="canvas-overlay"></canvas>
+            <button class="clear-btn" onclick="clearImage('disease')">
+              <i class="ti ti-x"></i> Hapus
+            </button>
+          </div>
+          <button
+            class="detect-btn disease"
+            id="btn-disease"
+            onclick="detect('disease')"
+            disabled
+          >
+            <div class="spinner" id="spin-disease"></div>
+            <i class="ti ti-sparkles" id="ico-disease"></i> Deteksi Penyakit
+            Daun
+          </button>
+          <div class="result-area" id="result-disease"></div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <i class="ti ti-calendar"></i>
+        <span>Tanggal: <span class="time-val" id="v-tanggal">—</span></span>
+        <i class="ti ti-clock" style="margin-left: 10px"></i>
+        <span>Waktu: <span class="time-val" id="v-waktu">—</span></span>
+        <span class="refresh-badge" id="v-refresh">Refresh: 0.0s lalu</span>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="script.js"></script>
+
+    <!-- ========================
+         PWA — Service Worker & Install
+         ======================== -->
+    <script>
+      /* -------- Service Worker Registration -------- */
+      let swRegistration = null;
+
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", async () => {
+          try {
+            swRegistration = await navigator.serviceWorker.register(
+              "./service-worker.js",
+            );
+            console.log(
+              "[PWA] Service worker registered:",
+              swRegistration.scope,
+            );
+
+            /* Cek update tersedia */
+            swRegistration.addEventListener("updatefound", () => {
+              const newWorker = swRegistration.installing;
+              newWorker.addEventListener("statechange", () => {
+                if (
+                  newWorker.state === "installed" &&
+                  navigator.serviceWorker.controller
+                ) {
+                  /* Update tersedia — tampilkan toast */
+                  document.getElementById("update-toast").style.display =
+                    "block";
+                }
+              });
+            });
+          } catch (err) {
+            console.warn("[PWA] Service worker registration failed:", err);
+          }
+        });
+
+        /* Reload otomatis setelah SW baru aktif */
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      }
+
+      /* -------- Apply Update -------- */
+      function applyUpdate() {
+        document.getElementById("update-toast").style.display = "none";
+        if (swRegistration && swRegistration.waiting) {
+          swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+      }
+
+      /* -------- Offline / Online Detection -------- */
+      const offlineBar = document.getElementById("offline-bar");
+
+      function updateOnlineStatus() {
+        offlineBar.style.display = navigator.onLine ? "none" : "block";
+      }
+
+      window.addEventListener("online", updateOnlineStatus);
+      window.addEventListener("offline", updateOnlineStatus);
+      updateOnlineStatus();
+
+      /* -------- PWA Install Prompt -------- */
+      let deferredPrompt = null;
+      const installBanner = document.getElementById("pwa-install-banner");
+      const btnInstall = document.getElementById("btn-install-pwa");
+      const btnDismiss = document.getElementById("btn-dismiss-pwa");
+
+      /* Jangan tampilkan banner jika sudah pernah dismiss */
+      const DISMISS_KEY = "pwa-install-dismissed";
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        /* Tampilkan setelah 5 detik, jika belum dismiss */
+        if (!sessionStorage.getItem(DISMISS_KEY)) {
+          setTimeout(() => {
+            installBanner.style.display = "flex";
+          }, 5000);
+        }
+      });
+
+      btnInstall.addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        installBanner.style.display = "none";
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log("[PWA] Install outcome:", outcome);
+        deferredPrompt = null;
+      });
+
+      btnDismiss.addEventListener("click", () => {
+        installBanner.style.display = "none";
+        sessionStorage.setItem(DISMISS_KEY, "1");
+      });
+
+      /* Sembunyikan banner jika sudah terinstall */
+      window.addEventListener("appinstalled", () => {
+        installBanner.style.display = "none";
+        deferredPrompt = null;
+        console.log("[PWA] App installed!");
+      });
+    </script>
+  </body>
+</html>

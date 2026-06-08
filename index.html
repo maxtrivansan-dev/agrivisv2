@@ -582,6 +582,21 @@
               <i class="ti ti-x"></i> Hapus
             </button>
           </div>
+          <div class="threshold-row">
+            <label class="threshold-label">
+              <i class="ti ti-adjustments-horizontal"></i> Min. Confidence:
+            </label>
+            <input
+              class="threshold-input"
+              type="range"
+              id="thresh-fruit"
+              min="0"
+              max="100"
+              value="30"
+              oninput="updateThreshLabel('fruit')"
+            />
+            <span class="threshold-val" id="thresh-val-fruit">30%</span>
+          </div>
           <button
             class="detect-btn fruit"
             id="btn-fruit"
@@ -624,6 +639,22 @@
             <button class="clear-btn" onclick="clearImage('disease')">
               <i class="ti ti-x"></i> Hapus
             </button>
+          </div>
+          <!-- Taruh sebelum <button class="detect-btn disease" ...> -->
+          <div class="threshold-row">
+            <label class="threshold-label">
+              <i class="ti ti-adjustments-horizontal"></i> Min. Confidence:
+            </label>
+            <input
+              class="threshold-input"
+              type="range"
+              id="thresh-disease"
+              min="0"
+              max="100"
+              value="30"
+              oninput="updateThreshLabel('disease')"
+            />
+            <span class="threshold-val" id="thresh-val-disease">30%</span>
           </div>
           <button
             class="detect-btn disease"

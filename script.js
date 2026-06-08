@@ -510,25 +510,51 @@ function handleFile(e, tab) {
   if (f) loadImage(f, tab);
 }
 
+// ✅ DIPERBAIKI: resize gambar ke max 640px sebelum kirim ke Roboflow
 function loadImage(file, tab) {
   const reader = new FileReader();
   reader.onload = (e) => {
-    const dataURL = e.target.result,
-      base64 = dataURL.split(",")[1];
-    aiState[tab].file = file;
-    aiState[tab].base64 = base64;
-    const img = document.getElementById("img-" + tab);
-    img.src = dataURL;
+    const originalDataURL = e.target.result;
+    const img = new Image();
     img.onload = () => {
-      aiState[tab].naturalW = img.naturalWidth;
-      aiState[tab].naturalH = img.naturalHeight;
+      // Resize ke max 640px (sama seperti yang Roboflow UI lakukan)
+      const MAX = 640;
+      let w = img.naturalWidth,
+        h = img.naturalHeight;
+      if (w > MAX || h > MAX) {
+        if (w > h) {
+          h = Math.round((h * MAX) / w);
+          w = MAX;
+        } else {
+          w = Math.round((w * MAX) / h);
+          h = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const base64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1];
+
+      aiState[tab].file = file;
+      aiState[tab].base64 = base64;
+
+      // Preview tetap pakai gambar original
+      const previewImg = document.getElementById("img-" + tab);
+      previewImg.src = originalDataURL;
+      previewImg.onload = () => {
+        aiState[tab].naturalW = previewImg.naturalWidth;
+        aiState[tab].naturalH = previewImg.naturalHeight;
+      };
+      aiState[tab].imgEl = previewImg;
+
+      document.getElementById("upload-" + tab).style.display = "none";
+      document.getElementById("preview-" + tab).style.display = "block";
+      document.getElementById("btn-" + tab).disabled = false;
+      document.getElementById("result-" + tab).innerHTML = "";
+      clearCanvas(tab);
     };
-    aiState[tab].imgEl = img;
-    document.getElementById("upload-" + tab).style.display = "none";
-    document.getElementById("preview-" + tab).style.display = "block";
-    document.getElementById("btn-" + tab).disabled = false;
-    document.getElementById("result-" + tab).innerHTML = "";
-    clearCanvas(tab);
+    img.src = originalDataURL;
   };
   reader.readAsDataURL(file);
 }
@@ -615,32 +641,17 @@ async function detect(tab) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
 
-    let preds = [];
+    // Kedua model pakai format object detection (array dengan koordinat)
+    let preds = data.predictions || [];
+    preds.sort((a, b) => b.confidence - a.confidence);
 
-    if (tab === "disease") {
-      // Classification API: response berupa { predictions: { "ClassName": 0.95, ... } }
-      if (
-        data.predictions &&
-        typeof data.predictions === "object" &&
-        !Array.isArray(data.predictions)
-      ) {
-        preds = Object.entries(data.predictions)
-          .map(([cls, conf]) => ({
-            class: cls,
-            confidence:
-              typeof conf === "number" ? conf : (conf.confidence ?? 0),
-          }))
-          .sort((a, b) => b.confidence - a.confidence);
-      } else if (Array.isArray(data.predictions)) {
-        preds = data.predictions.sort((a, b) => b.confidence - a.confidence);
-      }
-      clearCanvas(tab); // classification tidak pakai bounding box
-    } else {
-      // Detection API (fruit): response berupa { predictions: [ {x,y,width,height,...} ] }
-      preds = data.predictions || [];
-      if (preds.length > 0) setTimeout(() => drawBoxes(tab, preds), 100);
-      else clearCanvas(tab);
-    }
+    // Filter threshold setelah preds diisi
+    const threshold =
+      parseFloat(document.getElementById("thresh-" + tab).value) / 100;
+    preds = preds.filter((p) => p.confidence >= threshold);
+
+    if (preds.length > 0) setTimeout(() => drawBoxes(tab, preds), 100);
+    else clearCanvas(tab);
 
     res.innerHTML = renderResult(tab, preds, data);
   } catch (e) {
@@ -652,6 +663,11 @@ async function detect(tab) {
   ico.style.display = "";
 }
 
+function updateThreshLabel(tab) {
+  const val = document.getElementById("thresh-" + tab).value;
+  document.getElementById("thresh-val-" + tab).textContent = val + "%";
+}
+
 function confClass(c) {
   return c >= 0.75 ? "conf-high" : c >= 0.45 ? "conf-mid" : "conf-low";
 }
@@ -659,12 +675,232 @@ function barColor(c) {
   return c >= 0.75 ? "#1D9E75" : c >= 0.45 ? "#BA7517" : "#E24B4A";
 }
 
+// =============================================
+// DATABASE PENYAKIT DAUN MELON
+// =============================================
+const DISEASE_DB = {
+  "powdery mildew": {
+    nama: "Embun Tepung (Powdery Mildew)",
+    penyebab:
+      "Jamur Sphaerotheca fuliginea, dipicu kelembaban tinggi & sirkulasi udara buruk",
+    bahaya: 3, // 1-5
+    bahayaLabel: "Sedang-Tinggi",
+    obatKimia: [
+      {
+        nama: "Fungisida Sulfur",
+        dosis:
+          "Semprotkan larutan 2–3 g/L setiap 7 hari. Efektif sebagai pencegah dan pengobatan awal.",
+      },
+      {
+        nama: "Triadimenol / Hexaconazole",
+        dosis:
+          "Fungisida sistemik, semprotkan 1 mL/L air. Rotasi setiap 14 hari agar tidak resisten.",
+      },
+    ],
+    obatOrganik:
+      "Semprotkan larutan baking soda (1 sdt/1L air + 1 tetes sabun cuci). Alternatif: ekstrak bawang putih 10 mL/L air, semprotkan pagi hari.",
+    langkah: [
+      "Isolasi tanaman yang terinfeksi agar tidak menyebar ke tanaman sehat lainnya",
+      "Potong dan buang daun yang terinfeksi parah, bakar atau kubur jauh dari area tanam",
+      "Aktifkan kipas ventilasi — turunkan kelembaban ke 60–70%, pastikan sirkulasi udara baik",
+      "Semprotkan fungisida merata ke seluruh permukaan daun (atas & bawah) pagi hari",
+      "Monitor setiap 3 hari, ulangi penyemprotan jika gejala masih muncul setelah 7 hari",
+    ],
+    pencegahan:
+      "Jaga kelembaban <70%, semprot fungisida preventif tiap 14 hari",
+    warna: "amber",
+  },
+  "downy mildew": {
+    nama: "Embun Bulu (Downy Mildew)",
+    penyebab:
+      "Oomycete Pseudoperonospora cubensis, menyebar lewat spora di udara lembab",
+    bahaya: 4,
+    bahayaLabel: "Tinggi",
+    obatKimia: [
+      {
+        nama: "Metalaxyl + Mancozeb",
+        dosis:
+          "Campurkan 2 g/L air, semprotkan tiap 7 hari terutama pada musim hujan.",
+      },
+      {
+        nama: "Propamocarb",
+        dosis: "Fungisida sistemik, 2 mL/L air, efektif untuk Oomycete.",
+      },
+    ],
+    obatOrganik:
+      "Semprotkan tembaga hidroksida (copper hydroxide) organik 3 g/L air. Hindari penyiraman berlebihan pada daun.",
+    langkah: [
+      "Segera buang dan musnahkan daun bergejala (bercak kuning di atas, spora ungu di bawah daun)",
+      "Hindari menyiram daun langsung — arahkan air ke media tanam/akar saja",
+      "Tingkatkan jarak tanam antar tanaman untuk sirkulasi udara lebih baik",
+      "Semprotkan fungisida sistemik pada pagi hari saat cuaca cerah",
+      "Sterilkan alat potong dengan alkohol 70% setelah digunakan pada tanaman sakit",
+      "Evaluasi kondisi 5–7 hari setelah pengobatan pertama",
+    ],
+    pencegahan:
+      "Hindari kelembaban >80%, pilih varietas tahan penyakit, lakukan rotasi fungisida",
+    warna: "red",
+  },
+  anthracnose: {
+    nama: "Antraknosa (Anthracnose)",
+    penyebab:
+      "Jamur Colletotrichum orbiculare, aktif pada suhu 24–30°C dengan kelembaban tinggi",
+    bahaya: 4,
+    bahayaLabel: "Tinggi",
+    obatKimia: [
+      {
+        nama: "Mankozeb 80 WP",
+        dosis: "Campurkan 2 g/L air, semprotkan setiap 7–10 hari.",
+      },
+      {
+        nama: "Azoxystrobin",
+        dosis: "Fungisida sistemik, 0,5–1 mL/L air, rotasi tiap 14 hari.",
+      },
+    ],
+    obatOrganik:
+      "Gunakan trichoderma sp. (agen hayati) dicampurkan ke media tanam dan semprotkan larutan kunyit 10 g/L.",
+    langkah: [
+      "Buang dan musnahkan seluruh bagian tanaman yang terinfeksi (jangan kompos)",
+      "Pastikan drainase media tanam baik, hindari genangan air",
+      "Kurangi percikan air dari media ke daun saat penyiraman",
+      "Semprotkan fungisida kontak secara merata tiap 7 hari",
+      "Gunakan mulsa untuk mencegah cipratan spora dari tanah",
+    ],
+    pencegahan:
+      "Sanitasi kebun rutin, hindari luka mekanis pada batang/buah, semprotkan preventif tiap 2 minggu",
+    warna: "red",
+  },
+  "cercospora leaf spot": {
+    nama: "Bercak Daun Cercospora",
+    penyebab:
+      "Jamur Cercospora citrullina, menyebar melalui percikan air dan angin",
+    bahaya: 2,
+    bahayaLabel: "Sedang",
+    obatKimia: [
+      {
+        nama: "Mankozeb / Propineb",
+        dosis: "Semprotkan 2 g/L air setiap 10–14 hari.",
+      },
+      {
+        nama: "Klorotalonil",
+        dosis: "Fungisida kontak, 2 mL/L air, efektif untuk pencegahan.",
+      },
+    ],
+    obatOrganik:
+      "Semprotkan larutan ekstrak mimba (neem oil) 5 mL/L air dicampur sedikit sabun cuci.",
+    langkah: [
+      "Buang daun tua dan terinfeksi yang berada di bagian bawah tanaman",
+      "Pastikan jarak antar tanaman cukup untuk sirkulasi udara",
+      "Semprotkan fungisida pada sore hari agar tidak cepat menguap",
+      "Monitor perkembangan bercak setiap 5 hari sekali",
+    ],
+    pencegahan: "Sanitasi daun gugur, rotasi tanaman, hindari genangan",
+    warna: "amber",
+  },
+  "fusarium wilt": {
+    nama: "Layu Fusarium (Fusarium Wilt)",
+    penyebab:
+      "Jamur Fusarium oxysporum f.sp. melonis di dalam tanah, menyerang pembuluh xilem",
+    bahaya: 5,
+    bahayaLabel: "Sangat Tinggi",
+    obatKimia: [
+      {
+        nama: "Benomyl / Carbendazim",
+        dosis: "Siramkan larutan 2 g/L ke zona akar setiap 10 hari.",
+      },
+      {
+        nama: "Thiophanate-methyl",
+        dosis: "Fungisida sistemik, siramkan 1–2 g/L ke media tanam.",
+      },
+    ],
+    obatOrganik:
+      "Aplikasikan Trichoderma harzianum ke media tanam sebagai agen biokontrol. Campurkan 10 g/tanaman.",
+    langkah: [
+      "SEGERA cabut dan musnahkan tanaman yang sudah layu total — tidak bisa pulih",
+      "Jangan gunakan kembali media tanam yang terkontaminasi tanpa sterilisasi",
+      "Sterilisasi pot/wadah dengan larutan pemutih 10% sebelum digunakan ulang",
+      "Periksa tanaman di sekitarnya, siram fungisida preventif ke zona akar",
+      "Ganti ke varietas melon tahan fusarium untuk penanaman berikutnya",
+    ],
+    pencegahan:
+      "Gunakan bibit bersertifikat, sterilisasi media tanam sebelum tanam, pH larutan nutrisi 5.5–6.5",
+    warna: "red",
+  },
+  virus: {
+    nama: "Penyakit Virus (Mosaik/Kuning)",
+    penyebab:
+      "Cucumber Mosaic Virus (CMV) atau Watermelon Mosaic Virus, ditularkan kutu daun (aphid)",
+    bahaya: 4,
+    bahayaLabel: "Tinggi",
+    obatKimia: [
+      {
+        nama: "Insektisida Imidakloprid",
+        dosis: "Basmi vektor kutu daun, 0.5 mL/L air, semprot tiap 7 hari.",
+      },
+    ],
+    obatOrganik:
+      "Semprotkan ekstrak bawang putih + cabai (10 g/L) untuk mengusir kutu daun sebagai vektor virus.",
+    langkah: [
+      "Tidak ada pengobatan langsung untuk virus — fokus pada pengendalian vektor (kutu daun)",
+      "Cabut tanaman bergejala parah untuk mencegah penyebaran",
+      "Semprotkan insektisida untuk membasmi kutu daun secara menyeluruh",
+      "Pasang perangkap kuning (yellow sticky trap) di sekitar area tanam",
+      "Cuci tangan dan sterilkan alat setelah menyentuh tanaman sakit",
+    ],
+    pencegahan:
+      "Gunakan benih bebas virus, pasang kasa serangga di greenhouse, monitor populasi kutu daun",
+    warna: "red",
+  },
+  "bacterial wilt": {
+    nama: "Layu Bakteri (Bacterial Wilt)",
+    penyebab:
+      "Bakteri Erwinia tracheiphila, disebarkan oleh kumbang mentimun (cucumber beetle)",
+    bahaya: 4,
+    bahayaLabel: "Tinggi",
+    obatKimia: [
+      {
+        nama: "Streptomycin Sulfate",
+        dosis: "Semprotkan 1–2 g/L sebagai langkah awal, efektivitas terbatas.",
+      },
+      {
+        nama: "Kasugamycin",
+        dosis: "Bakterisida sistemik, 1 mL/L air, aplikasikan 2x seminggu.",
+      },
+    ],
+    obatOrganik:
+      "Semprotkan campuran tembaga oksiklorida 3 g/L. Basmi serangga vektor dengan insektisida organik pyrethrin.",
+    langkah: [
+      "Cabut tanaman yang sudah layu sepenuhnya dan segera musnahkan",
+      "Semprotkan insektisida untuk mengendalikan kumbang mentimun sebagai vektor",
+      "Periksa tanaman sekitarnya setiap hari selama 2 minggu ke depan",
+      "Bersihkan dan sterilkan area tanam setelah mencabut tanaman sakit",
+    ],
+    pencegahan:
+      "Pasang perangkap serangga, gunakan jaring pelindung, pilih varietas tahan layu bakteri",
+    warna: "red",
+  },
+};
+
+function getDiseaseInfo(className) {
+  if (!className) return null;
+  const lower = className.toLowerCase().trim();
+  // Coba exact match dulu
+  if (DISEASE_DB[lower]) return DISEASE_DB[lower];
+  // Coba partial match
+  for (const key of Object.keys(DISEASE_DB)) {
+    if (lower.includes(key) || key.includes(lower)) return DISEASE_DB[key];
+  }
+  return null;
+}
+
 function renderResult(tab, preds, data) {
   if (!preds.length)
     return `<div class="result-area"><div class="no-result"><i class="ti ti-mood-empty" style="font-size:32px;color:var(--text3)"></i><span>Tidak ada objek terdeteksi. Coba dengan foto yang lebih jelas.</span></div></div>`;
+
   const top = preds.reduce((a, b) => (a.confidence > b.confidence ? a : b));
   let summary = "",
     summaryClass = "";
+
   if (tab === "fruit") {
     const cls = (top.class || "").toLowerCase();
     if (cls.includes("matang") || cls.includes("ripe")) {
@@ -687,17 +923,124 @@ function renderResult(tab, preds, data) {
       summaryClass = "sakit";
     }
   }
+
   const sorted = [...preds].sort((a, b) => b.confidence - a.confidence);
   const rows = sorted
     .map(
       (p) =>
-        `<div class="result-item"><div class="result-class">${p.class}</div><div class="result-bar-wrap"><div class="result-bar"><div class="result-bar-fill" style="width:${(p.confidence * 100).toFixed(1)}%;background:${barColor(p.confidence)}"></div></div></div><div class="result-conf ${confClass(p.confidence)}">${(p.confidence * 100).toFixed(1)}%</div></div>`,
+        `<div class="result-item">
+      <div class="result-class">${p.class}</div>
+      <div class="result-bar-wrap"><div class="result-bar"><div class="result-bar-fill" style="width:${(p.confidence * 100).toFixed(1)}%;background:${barColor(p.confidence)}"></div></div></div>
+      <div class="result-conf ${confClass(p.confidence)}">${(p.confidence * 100).toFixed(1)}%</div>
+    </div>`,
     )
     .join("");
+
   const imgInfo = data.image
     ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Resolusi: ${data.image.width}×${data.image.height}px &nbsp;|&nbsp; Objek terdeteksi: ${preds.length}</div>`
     : "";
-  return `<div class="result-area"><div class="result-box"><div style="margin-bottom:10px"><span class="summary-badge ${summaryClass}">${summary}</span></div><div class="result-header">Semua Deteksi (${preds.length} objek)</div>${rows}${imgInfo}</div></div>`;
+
+  // ── SARAN PENGOBATAN (hanya tab disease & bukan healthy) ──
+  let treatmentHTML = "";
+  if (tab === "disease" && summaryClass === "sakit") {
+    const info = getDiseaseInfo(top.class);
+    if (info) {
+      const dangerDots = Array.from(
+        { length: 5 },
+        (_, i) =>
+          `<div style="width:10px;height:10px;border-radius:2px;background:${i < info.bahaya ? "#e24b4a" : "var(--border2)"}"></div>`,
+      ).join("");
+
+      const kimiaRows = info.obatKimia
+        .map(
+          (o) =>
+            `<div class="treatment-item">
+          <strong style="color:var(--amber-text)">${o.nama}</strong>
+          <span style="color:var(--amber-text);opacity:0.85"> — ${o.dosis}</span>
+        </div>`,
+        )
+        .join("");
+
+      const langkahRows = info.langkah
+        .map(
+          (l, i) =>
+            `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px">
+          <div style="min-width:20px;height:20px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:white;flex-shrink:0;margin-top:1px">${i + 1}</div>
+          <span style="font-size:12px;color:var(--amber-text);line-height:1.55">${l}</span>
+        </div>`,
+        )
+        .join("");
+
+      treatmentHTML = `
+        <div class="treatment-card">
+          <div class="treatment-header">
+            <i class="ti ti-stethoscope" style="font-size:18px;color:var(--amber)"></i>
+            <span class="treatment-title">Diagnosa &amp; Penanganan</span>
+          </div>
+
+          <div class="treatment-meta">
+            <div class="treatment-meta-box">
+              <div class="treatment-meta-label">Penyebab</div>
+              <div class="treatment-meta-val">${info.penyebab}</div>
+            </div>
+            <div class="treatment-meta-box">
+              <div class="treatment-meta-label">Tingkat Bahaya</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                <div style="display:flex;gap:3px">${dangerDots}</div>
+                <span style="font-size:11px;color:var(--red-text);font-weight:500">${info.bahayaLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="treatment-section">
+            <div class="treatment-section-label"><i class="ti ti-pill" style="font-size:12px;margin-right:4px"></i>Pengobatan Kimia</div>
+            ${kimiaRows}
+          </div>
+
+          <div class="treatment-section">
+            <div class="treatment-section-label"><i class="ti ti-leaf" style="font-size:12px;margin-right:4px"></i>Alternatif Organik</div>
+            <div class="treatment-item" style="font-style:normal">
+              <span style="color:var(--amber-text);opacity:0.85">${info.obatOrganik}</span>
+            </div>
+          </div>
+
+          <div class="treatment-section">
+            <div class="treatment-section-label"><i class="ti ti-list-check" style="font-size:12px;margin-right:4px"></i>Langkah Penanganan</div>
+            ${langkahRows}
+          </div>
+
+          <div class="treatment-prevention">
+            <i class="ti ti-shield-check" style="font-size:15px;color:var(--green)"></i>
+            <span><strong style="color:var(--green-text)">Pencegahan:</strong> <span style="color:var(--green-text);opacity:0.85">${info.pencegahan}</span></span>
+          </div>
+        </div>`;
+    } else {
+      // Penyakit terdeteksi tapi tidak ada di database
+      treatmentHTML = `
+        <div class="treatment-card">
+          <div class="treatment-header">
+            <i class="ti ti-stethoscope" style="font-size:18px;color:var(--amber)"></i>
+            <span class="treatment-title">Penyakit Terdeteksi</span>
+          </div>
+          <p style="font-size:12.5px;color:var(--amber-text);line-height:1.6;margin:0">
+            Penyakit <strong>${top.class}</strong> terdeteksi. Segera konsultasikan dengan ahli pertanian atau periksa literatur penyakit melon untuk penanganan lebih lanjut. Langkah awal: isolasi tanaman, potong bagian yang terinfeksi, dan perhatikan kelembaban lingkungan.
+          </p>
+          <div class="treatment-prevention" style="margin-top:12px">
+            <i class="ti ti-alert-triangle" style="font-size:15px;color:var(--amber)"></i>
+            <span style="color:var(--amber-text)">Jaga kondisi lingkungan optimal: kelembaban 60–70%, sirkulasi udara baik</span>
+          </div>
+        </div>`;
+    }
+  }
+
+  return `<div class="result-area">
+    <div class="result-box">
+      <div style="margin-bottom:10px"><span class="summary-badge ${summaryClass}">${summary}</span></div>
+      <div class="result-header">Semua Deteksi (${preds.length} objek)</div>
+      ${rows}${imgInfo}
+    </div>
+    ${treatmentHTML}
+  </div>`;
 }
 
 initChart();

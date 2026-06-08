@@ -2,86 +2,93 @@
    SERVICE WORKER — Hidroponik Melon PWA
    =========================================== */
 
-const CACHE_NAME = 'hidromelon-v1';
-const STATIC_CACHE = 'hidromelon-static-v1';
-const DYNAMIC_CACHE = 'hidromelon-dynamic-v1';
+const CACHE_NAME = "hidromelon-v1";
+const STATIC_CACHE = "hidromelon-static-v1";
+const DYNAMIC_CACHE = "hidromelon-dynamic-v1";
 
 /* Aset statis yang di-cache saat install */
 const STATIC_ASSETS = [
-  '/agrivisv2/',
-  '/agrivisv2/index.html',
-  '/agrivisv2/style.css',
-  '/agrivisv2/script.js',
-  '/agrivisv2/manifest.json',
-  'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
+  "/agrivisv2/",
+  "/agrivisv2/index.html",
+  "/agrivisv2/style.css",
+  "/agrivisv2/script.js",
+  "/agrivisv2/manifest.json",
+  "https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css",
+  "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js",
 ];
 
 /* =====================
    INSTALL — Pre-cache aset statis
    ===================== */
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installing Hidroponik Melon PWA...');
+self.addEventListener("install", (event) => {
+  console.log("[SW] Installing Hidroponik Melon PWA...");
   event.waitUntil(
-    caches.open(STATIC_CACHE)
+    caches
+      .open(STATIC_CACHE)
       .then((cache) => {
-        console.log('[SW] Pre-caching static assets');
+        console.log("[SW] Pre-caching static assets");
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => self.skipWaiting())
       .catch((err) => {
-        console.warn('[SW] Pre-cache partial failure (CDN assets may require network):', err);
+        console.warn(
+          "[SW] Pre-cache partial failure (CDN assets may require network):",
+          err,
+        );
         return self.skipWaiting();
-      })
+      }),
   );
 });
 
 /* =====================
    ACTIVATE — Hapus cache lama
    ===================== */
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating new service worker...');
+self.addEventListener("activate", (event) => {
+  console.log("[SW] Activating new service worker...");
   event.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(
-        keyList.map((key) => {
-          if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
-            console.log('[SW] Removing old cache:', key);
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keyList) => {
+        return Promise.all(
+          keyList.map((key) => {
+            if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
+              console.log("[SW] Removing old cache:", key);
+              return caches.delete(key);
+            }
+          }),
+        );
+      })
+      .then(() => self.clients.claim()),
   );
 });
 
 /* =====================
    FETCH — Strategi cache
    ===================== */
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   /* --- Firebase Realtime DB: Network-first, fallback ke cache --- */
-  if (url.hostname.includes('firebasedatabase.app')) {
+  if (url.hostname.includes("firebasedatabase.app")) {
     event.respondWith(networkFirst(request));
     return;
   }
 
   /* --- Roboflow API: Network-only (tidak di-cache, data gambar besar) --- */
-  if (url.hostname.includes('roboflow.com')) {
-    event.respondWith(fetch(request).catch(() => offlineResponse('api')));
+  if (url.hostname.includes("roboflow.com")) {
+    event.respondWith(fetch(request).catch(() => offlineResponse("api")));
     return;
   }
 
   /* --- CDN (Tabler Icons, Chart.js): Cache-first --- */
-  if (url.hostname.includes('jsdelivr.net') || url.hostname.includes('cdn.')) {
+  if (url.hostname.includes("jsdelivr.net") || url.hostname.includes("cdn.")) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
   /* --- Aset lokal (HTML, CSS, JS): Cache-first --- */
-  if (request.method === 'GET') {
+  if (request.method === "GET") {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
   }
 });
@@ -102,11 +109,11 @@ async function cacheFirst(request, cacheName = DYNAMIC_CACHE) {
     return response;
   } catch (err) {
     /* Offline fallback untuk navigasi */
-    if (request.mode === 'navigate') {
-      const cachedHome = await caches.match('/agrivisv2/index.html');
+    if (request.mode === "navigate") {
+      const cachedHome = await caches.match("/agrivisv2/index.html");
       if (cachedHome) return cachedHome;
     }
-    return offlineResponse('page');
+    return offlineResponse("page");
   }
 }
 
@@ -124,7 +131,7 @@ async function networkFirst(request) {
   } catch (err) {
     const cached = await caches.match(request);
     if (cached) return cached;
-    return offlineResponse('api');
+    return offlineResponse("api");
   }
 }
 
@@ -132,13 +139,16 @@ async function networkFirst(request) {
    Offline fallback response
    ===================== */
 function offlineResponse(type) {
-  if (type === 'api') {
+  if (type === "api") {
     return new Response(
-      JSON.stringify({ error: 'offline', message: 'Tidak ada koneksi internet' }),
+      JSON.stringify({
+        error: "offline",
+        message: "Tidak ada koneksi internet",
+      }),
       {
         status: 503,
-        headers: { 'Content-Type': 'application/json' }
-      }
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
   /* Halaman offline minimal */
@@ -201,29 +211,29 @@ function offlineResponse(type) {
 </html>`,
     {
       status: 200,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' }
-    }
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    },
   );
 }
 
 /* =====================
    Push Notification handler (opsional, untuk masa depan)
    ===================== */
-self.addEventListener('push', (event) => {
+self.addEventListener("push", (event) => {
   if (!event.data) return;
   const data = event.data.json();
-  self.registration.showNotification(data.title || 'Hidroponik Melon', {
-    body: data.body || 'Ada notifikasi baru dari sistem',
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-96.png',
-    tag: 'hidromelon-alert',
+  self.registration.showNotification(data.title || "Hidroponik Melon", {
+    body: data.body || "Ada notifikasi baru dari sistem",
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-96.png",
+    tag: "hidromelon-alert",
     renotify: true,
-    data: { url: data.url || '/agrivisv2/' }
+    data: { url: data.url || "/agrivisv2/" },
   });
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/agrivisv2/';
+  const url = event.notification.data?.url || "/agrivisv2/";
   event.waitUntil(clients.openWindow(url));
 });

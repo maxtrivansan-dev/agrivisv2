@@ -123,14 +123,19 @@ async function cacheFirst(request, cacheName = DYNAMIC_CACHE) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+
+    if (response.ok && request.method === "GET") {
       const cache = await caches.open(DYNAMIC_CACHE);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone());
     }
+
     return response;
   } catch (err) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
+    if (request.method === "GET") {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+    }
+
     return offlineResponse("api");
   }
 }

@@ -3,7 +3,7 @@ const FIREBASE_HOST =
 const FIREBASE_AUTH = "Tq9h05HXs91mIvIevX8WpjQtFyDl1lvGnaSTjVYR";
 const ROBOFLOW_KEY = "q4UPgFhZpQTxmloM5WA9";
 const API_FRUIT = "https://serverless.roboflow.com/melon-az4ls/1";
-const API_DISEASE = "https://serverless.roboflow.com/cnn-melon/3";
+const API_DISEASE = "https://serverless.roboflow.com/classification-cvb3q/12";
 const TDS_MIN = 800,
   TDS_MAX = 1200,
   KIPAS_ON = 32,
@@ -614,9 +614,34 @@ async function detect(tab) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    const preds = data.predictions || [];
-    if (preds.length > 0) setTimeout(() => drawBoxes(tab, preds), 100);
-    else clearCanvas(tab);
+
+    let preds = [];
+
+    if (tab === "disease") {
+      // Classification API: response berupa { predictions: { "ClassName": 0.95, ... } }
+      if (
+        data.predictions &&
+        typeof data.predictions === "object" &&
+        !Array.isArray(data.predictions)
+      ) {
+        preds = Object.entries(data.predictions)
+          .map(([cls, conf]) => ({
+            class: cls,
+            confidence:
+              typeof conf === "number" ? conf : (conf.confidence ?? 0),
+          }))
+          .sort((a, b) => b.confidence - a.confidence);
+      } else if (Array.isArray(data.predictions)) {
+        preds = data.predictions.sort((a, b) => b.confidence - a.confidence);
+      }
+      clearCanvas(tab); // classification tidak pakai bounding box
+    } else {
+      // Detection API (fruit): response berupa { predictions: [ {x,y,width,height,...} ] }
+      preds = data.predictions || [];
+      if (preds.length > 0) setTimeout(() => drawBoxes(tab, preds), 100);
+      else clearCanvas(tab);
+    }
+
     res.innerHTML = renderResult(tab, preds, data);
   } catch (e) {
     clearCanvas(tab);
